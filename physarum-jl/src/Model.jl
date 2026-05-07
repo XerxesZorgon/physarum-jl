@@ -8,7 +8,7 @@ export PhysarumParams, PhysarumAgent, PhysarumProperties,
     v2::Float64                = 0.5
     n_agents::Int              = 400
     deposit_amount::Float64    = 5.0
-    decay_rate::Float64        = 0.1
+    decay_rate::Float64        = 0.03
     food_chemo::Float64        = 500.0
     sensor_distance::Int       = 9
     sensor_angle_deg::Float64  = 45.0
@@ -19,6 +19,11 @@ export PhysarumParams, PhysarumAgent, PhysarumProperties,
     food_radius::Float64       = 3.0
     max_ticks::Int             = 5000
     chemo_threshold_pct::Float64 = 0.70
+
+    # Phase 2 — flow reinforcement parameters
+    return_deposit_multiplier::Float64 = 5.0
+    food_chemo_fade::Float64           = 0.97   # per-tick after first contact
+    beacon_chemo_fraction::Float64     = 0.30   # beacon = fraction × food_chemo
 end
 
 function effective_speeds(p::PhysarumParams)
@@ -30,6 +35,7 @@ end
 @agent struct PhysarumAgent(ContinuousAgent{2, Float64})
     heading::Float64
     speed::Float64
+    returning::Bool
 end
 
 mutable struct PhysarumProperties
@@ -46,6 +52,8 @@ mutable struct PhysarumProperties
     early_arrivals::Vector{Float64}   # x_cross of agents arriving
                                       # within 5% of first_contact_tick
     last_tick::Int
+    food_chemo_current::Float64                      # fades in Phase 2
+    beacon_idx::Union{CartesianIndex{2}, Nothing}    # boundary beacon
 end
 
 function build_model(params::PhysarumParams, seed::Int)
@@ -93,7 +101,9 @@ function build_model(params::PhysarumParams, seed::Int)
         -1,                         # first_contact_tick
         Tuple{Int,Float64}[],       # x_cross_history
         Float64[],                  # early_arrivals
-        0                           # last_tick
+        0,                          # last_tick
+        params.food_chemo,          # food_chemo_current
+        nothing                     # beacon_idx
     )
 
     model = StandardABM(PhysarumAgent, space;
@@ -112,9 +122,10 @@ function build_model(params::PhysarumParams, seed::Int)
         heading = 2π * rand(rng)
         spd = medium_speed[patch_idx(x), patch_idx(y)]
         add_agent!(SVector(x, y), model;
-                   vel = SVector(0.0, 0.0),
-                   heading = heading,
-                   speed = spd)
+                   vel       = SVector(0.0, 0.0),
+                   heading   = heading,
+                   speed     = spd,
+                   returning = false)
     end
 
     return model

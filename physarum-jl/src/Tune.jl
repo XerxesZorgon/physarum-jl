@@ -97,13 +97,16 @@ Deserialise PhysarumParams from JSON at `path`.
 function load_params(path::String)::PhysarumParams
     d = JSON3.read(read(path, String))
     PhysarumParams(
-        condition      = Symbol(d[:condition]),
-        v1             = Float64(d[:v1]),
-        v2             = Float64(d[:v2]),
-        decay_rate     = Float64(d[:decay_rate]),
-        deposit_amount = Float64(d[:deposit_amount]),
-        food_chemo     = Float64(d[:food_chemo]),
-        n_agents       = Int(d[:n_agents]),
-        max_ticks      = Int(d[:max_ticks])
+        condition                = Symbol(d[:condition]),
+        v1                       = Float64(d[:v1]),
+        v2                       = Float64(d[:v2]),
+        decay_rate               = Float64(d[:decay_rate]),
+        deposit_amount           = Float64(d[:deposit_amount]),
+        food_chemo               = Float64(d[:food_chemo]),
+        n_agents                 = Int(d[:n_agents]),
+        max_ticks                = Int(d[:max_ticks]),
+        return_deposit_multiplier= Float64(get(d, :return_deposit_multiplier, 5.0)),
+        food_chemo_fade          = Float64(get(d, :food_chemo_fade, 0.97)),
+        beacon_chemo_fraction    = Float64(get(d, :beacon_chemo_fraction, 0.30))
     )
 end

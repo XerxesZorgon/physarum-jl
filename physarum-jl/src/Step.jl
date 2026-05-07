@@ -76,11 +76,25 @@ function agent_step!(agent::PhysarumAgent, model)
     # 7. Deposit chemoattractant; mark patch visited
     xi = patch_idx(agent.pos[1])
     yj = patch_idx(agent.pos[2])
-    # Normalise by speed so deposit per unit path length is constant
-    # across zones. Without this, slow zones are over-reinforced
-    # (deposit/patch ∝ 1/v), biasing pruning away from the Snell path.
-    props.chemo[xi, yj]   += p.deposit_amount * agent.speed
-    props.visited[xi, yj]  = true
+    # Returning agents deposit at amplified rate (flow reinforcement)
+    deposit_multiplier        = agent.returning ? p.return_deposit_multiplier : 1.0
+    props.chemo[xi, yj]    += p.deposit_amount * agent.speed * deposit_multiplier
+    props.visited[xi, yj]   = true
+
+    # Phase 2: food contact → flip heading and enter return mode
+    if !agent.returning && CartesianIndex(xi, yj) ∈ props.food_idx
+        agent.returning = true
+        agent.heading  += π
+    end
+
+    # Phase 2: returning agent reaches source → reset to exploration
+    if agent.returning
+        if hypot(agent.pos[1] - p.source_sim[1],
+                 agent.pos[2] - p.source_sim[2]) <= p.source_radius
+            agent.returning = false
+            agent.heading   = 2π * rand(abmrng(model))
+        end
+    end
 
     # Log boundary x if this agent just entered a food patch
     if props.food_idx ∋ CartesianIndex(xi, yj) &&
@@ -108,9 +122,35 @@ function model_step!(model)
     # 3. Zero sub-threshold values
     @. props.chemo = ifelse(props.chemo < 0.001, 0.0, props.chemo)
 
-    # 4. Replenish food patches (Dirichlet source — applied after diffusion)
+    # 4. Replenish food — Phase 2: fade gradient so return flow takes over
+    if props.first_contact_tick > 0
+        props.food_chemo_current = max(
+            p.food_chemo * 0.05,
+            props.food_chemo_current * p.food_chemo_fade
+        )
+    end
     for idx in props.food_idx
-        props.chemo[idx] = p.food_chemo
+        props.chemo[idx] = props.food_chemo_current
+    end
+
+    # 4b. Boundary beacon — set once at first_contact_tick + 5, replenish every tick
+    tick = abmtime(model)
+    if props.first_contact_tick > 0 && isnothing(props.beacon_idx) &&
+       tick >= props.first_contact_tick + 5
+        # Find highest-chemo visited boundary patch — approximates Snell's Law crossing
+        best_c   = -Inf
+        best_idx = nothing
+        for idx in props.boundary_idx
+            c = props.chemo[idx]
+            if props.visited[idx] && c > best_c
+                best_c   = c
+                best_idx = idx
+            end
+        end
+        props.beacon_idx = best_idx
+    end
+    if !isnothing(props.beacon_idx)
+        props.chemo[props.beacon_idx] += p.food_chemo * p.beacon_chemo_fraction
     end
 
     # 5. First-contact detection
