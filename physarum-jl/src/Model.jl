@@ -94,8 +94,10 @@ function build_model(params::PhysarumParams, seed::Int)
     )
 
     model = StandardABM(PhysarumAgent, space;
-                        properties = props,
-                        rng = Xoshiro(seed))
+                        properties  = props,
+                        agent_step! = agent_step!,
+                        model_step! = model_step!,
+                        rng         = Xoshiro(seed))
 
     # Spawn agents within source_radius of source_sim
     rng = abmrng(model)
