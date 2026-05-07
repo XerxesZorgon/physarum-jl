@@ -2,11 +2,11 @@ using PhysarumSim, Statistics
 
 println("=" ^ 60)
 println("Phase 1 tuning — maximising pruning quality")
-println("Time budget: 300 seconds | max_ticks per run: 2000")
+println("Time budget: 300 seconds | max_ticks per run: 3000")
 println("=" ^ 60)
 
-# Use max_ticks=2000 for tuning speed; food found ~tick 309
-base = PhysarumParams(max_ticks=2000)
+# Use max_ticks=3000 for tuning speed; food found ~tick 309
+base = PhysarumParams(max_ticks=3000, chemo_threshold_pct=0.60)
 tuned = run_tuning(base; time_budget_sec=300)
 
 println("\nTuned parameters:")
@@ -33,7 +33,8 @@ p_c = PhysarumParams(
     deposit_amount = tuned.deposit_amount,
     food_chemo     = tuned.food_chemo,
     n_agents       = tuned.n_agents,
-    max_ticks      = 5000
+    max_ticks      = 5000,
+    chemo_threshold_pct = 0.60
 )
 res_c = [run_replicate(p_c, i, i) for i in 1:10]
 

@@ -21,16 +21,18 @@ function phase1_objective(x::Vector{Float64};
         deposit_amount = x[2],
         food_chemo     = x[3],
         n_agents       = round(Int, x[4]),
-        max_ticks      = base_params.max_ticks
+        max_ticks      = base_params.max_ticks,
+        chemo_threshold_pct = base_params.chemo_threshold_pct
     )
 
     scores = Vector{Float64}(undef, n_eval)
     Threads.@threads for i in 1:n_eval
         r = run_replicate(params, i, seeds[i])
         # Guard constraints (ADR-003): penalise failed runs
-        if r.first_contact_tick == params.max_ticks ||
-           r.x_cross_final == -9999.0
+        if r.first_contact_tick == params.max_ticks
             scores[i] = 0.0
+        elseif r.x_cross_final == -9999.0
+            scores[i] = 0.1   # partial credit: found food but no tube
         else
             scores[i] = r.q_prune
         end
@@ -71,7 +73,8 @@ function run_tuning(base_params::PhysarumParams;
         deposit_amount = x[2],
         food_chemo     = x[3],
         n_agents       = round(Int, x[4]),
-        max_ticks      = base_params.max_ticks
+        max_ticks      = base_params.max_ticks,
+        chemo_threshold_pct = base_params.chemo_threshold_pct
     )
 end
 
