@@ -51,7 +51,53 @@ function monte_carlo(base_params::PhysarumParams,
     error("monte_carlo not yet implemented — see T022")
 end
 
+"""
+    save_runs(results, results_dir)
+
+Write per-run summary CSVs and time-course CSVs for each condition
+to `results_dir`. Creates the directory if it does not exist.
+
+Output files per condition key (lowercased symbol):
+  runs_[cond].csv       — one row per RunResult
+  timecourse_[cond].csv — one row per (tick, x_cross) entry
+"""
 function save_runs(results::Dict{Symbol,Vector{RunResult}},
                    results_dir::String)
-    error("save_runs not yet implemented — see T015")
+    mkpath(results_dir)
+
+    for (cond, runs) in results
+        cond_str = lowercase(string(cond))
+
+        # ── Per-run summary ───────────────────────────────────────────
+        run_rows = [(
+            run_id                  = r.run_id,
+            condition               = string(r.condition),
+            seed                    = r.seed,
+            v1                      = r.params.v1,
+            v2                      = r.params.v2,
+            decay_rate              = r.params.decay_rate,
+            deposit_amount          = r.params.deposit_amount,
+            food_chemo              = r.params.food_chemo,
+            n_agents                = r.params.n_agents,
+            first_contact_tick      = r.first_contact_tick,
+            x_cross_final           = r.x_cross_final,
+            x_cross_at_first_contact = r.x_cross_at_first_contact,
+            q_prune                 = r.q_prune,
+            total_ticks             = r.total_ticks,
+        ) for r in runs]
+
+        CSV.write(joinpath(results_dir, "runs_$(cond_str).csv"),
+                  DataFrame(run_rows))
+
+        # ── Time-course ───────────────────────────────────────────────
+        tc_rows = [(
+            run_id    = r.run_id,
+            condition = string(r.condition),
+            tick      = t,
+            x_cross   = xc,
+        ) for r in runs for (t, xc) in r.x_cross_history]
+
+        CSV.write(joinpath(results_dir, "timecourse_$(cond_str).csv"),
+                  DataFrame(tc_rows))
+    end
 end
