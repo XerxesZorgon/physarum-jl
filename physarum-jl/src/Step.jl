@@ -56,17 +56,17 @@ function agent_step!(agent::PhysarumAgent, model)
     nx = agent.pos[1] + agent.speed * sin(agent.heading)
     ny = agent.pos[2] + agent.speed * cos(agent.heading)
 
-    # 5. Reflective boundaries
-    if nx < 0.0 || nx > 200.0
-        agent.heading = -agent.heading
-        nx = agent.pos[1] + agent.speed * sin(agent.heading)
+    # 5. Boundary: respawn at source (biologically motivated —
+    #    Physarum retracts pseudopods that reach dead ends and
+    #    redeploys from the main body)
+    if nx < 0.0 || nx > 200.0 || ny < 0.0 || ny > 200.0
+        rng   = abmrng(model)
+        r_s   = props.params.source_radius * sqrt(rand(rng))
+        θ_s   = 2π * rand(rng)
+        nx    = clamp(props.params.source_sim[1] + r_s * cos(θ_s), 0.0, 200.0)
+        ny    = clamp(props.params.source_sim[2] + r_s * sin(θ_s), 0.0, 200.0)
+        agent.heading = 2π * rand(rng)
     end
-    if ny < 0.0 || ny > 200.0
-        agent.heading = π - agent.heading
-        ny = agent.pos[2] + agent.speed * cos(agent.heading)
-    end
-    nx = clamp(nx, 0.0, 200.0)
-    ny = clamp(ny, 0.0, 200.0)
 
     # 6. Move; update vel for bookkeeping
     agent.vel = SVector(agent.speed * sin(agent.heading),
