@@ -1,4 +1,4 @@
-using Test, PhysarumSim
+using Test, Agents, PhysarumSim
 
 @testset "PhysarumSim" begin
     include("test_model.jl")
