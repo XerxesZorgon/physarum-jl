@@ -82,47 +82,40 @@ let p0 = PhysarumParams(n_agents=1, food_chemo=0.0, max_ticks=2),
     end
 end
 
-@testset "S: Boundary respawn" begin
+@testset "S: Boundary reflection" begin
     pb = PhysarumParams(n_agents=1, food_chemo=0.0, max_ticks=200)
 
-    # S-09: Agent near right wall heading east → stays within world
+    # S-09: Agent near right wall heading east → pos stays ≤ 200.0
     m9 = build_model(pb, 1)
     a9 = first(allagents(m9))
     move_agent!(a9, SVector(199.5, 50.5), m9)
-    a9.heading = π/2  # east — will overshoot right wall
+    a9.heading = π/2  # east
     abmproperties(m9).chemo .= 0.0
     agent_step!(a9, m9)
-    @test 0.0 <= a9.pos[1] <= 200.0
-    @test 0.0 <= a9.pos[2] <= 200.0
+    @test a9.pos[1] <= 200.0
 
-    # S-10: After boundary hit, agent is near source (not near wall)
-    src = pb.source_sim
-    dist_to_src = hypot(a9.pos[1] - src[1], a9.pos[2] - src[2])
-    @test dist_to_src <= pb.source_radius + 1.0
+    # S-10: After right-wall reflection, agent no longer heading east
+    @test sin(a9.heading) < 0.0  # now heading west (sin(-π/2) = -1)
 
-    # S-11: Agent near top wall heading north → respawned near source
-    m11 = build_model(pb, 2)
+    # S-11: Agent near top wall heading north → heading becomes south (π)
+    m11 = build_model(pb, 1)
     a11 = first(allagents(m11))
     move_agent!(a11, SVector(50.5, 199.9), m11)
-    a11.heading = 0.0  # north — will overshoot top wall
+    a11.heading = 0.0  # north
     abmproperties(m11).chemo .= 0.0
     agent_step!(a11, m11)
-    @test 0.0 <= a11.pos[1] <= 200.0
-    @test 0.0 <= a11.pos[2] <= 200.0
-    @test hypot(a11.pos[1] - src[1],
-                a11.pos[2] - src[2]) <= pb.source_radius + 1.0
+    @test a11.heading ≈ π  atol=1e-10
 
-    # S-12: Agent near bottom wall heading south → respawned near source
-    m12 = build_model(pb, 3)
+    # S-12: Agent near bottom wall heading south → reflected north
+    m12 = build_model(pb, 1)
     a12 = first(allagents(m12))
     move_agent!(a12, SVector(50.5, 0.5), m12)
-    a12.heading = π  # south — will overshoot bottom wall
+    a12.heading = π  # south
     abmproperties(m12).chemo .= 0.0
     agent_step!(a12, m12)
-    @test 0.0 <= a12.pos[1] <= 200.0
-    @test 0.0 <= a12.pos[2] <= 200.0
+    @test cos(a12.heading) > 0.0  # heading northward
 
-    # S-13: No agent escapes world bounds over 100 steps (unchanged)
+    # S-13: No agent escapes world bounds over 100 steps
     m13 = build_model(pb, 42)
     abmproperties(m13).chemo .= 0.0
     step!(m13, 100)
