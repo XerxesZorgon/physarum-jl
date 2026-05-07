@@ -76,8 +76,21 @@ function agent_step!(agent::PhysarumAgent, model)
     # 7. Deposit chemoattractant; mark patch visited
     xi = patch_idx(agent.pos[1])
     yj = patch_idx(agent.pos[2])
-    props.chemo[xi, yj]   += p.deposit_amount
+    # Normalise by speed so deposit per unit path length is constant
+    # across zones. Without this, slow zones are over-reinforced
+    # (deposit/patch ∝ 1/v), biasing pruning away from the Snell path.
+    props.chemo[xi, yj]   += p.deposit_amount * agent.speed
     props.visited[xi, yj]  = true
+
+    # Log boundary x if this agent just entered a food patch
+    if props.food_idx ∋ CartesianIndex(xi, yj) &&
+       props.first_contact_tick > 0
+        tick = props.last_tick
+        window = max(1, round(Int, 0.05 * props.first_contact_tick))
+        if tick <= props.first_contact_tick + window
+            push!(props.early_arrivals, netlogo_x(xi))
+        end
+    end
 end
 
 # ── Model step ────────────────────────────────────────────────────────────────

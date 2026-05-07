@@ -37,7 +37,7 @@ using CSV, DataFrames
     expected_cols = ["run_id", "condition", "seed", "v1", "v2",
                      "decay_rate", "deposit_amount", "food_chemo",
                      "n_agents", "first_contact_tick", "x_cross_final",
-                     "x_cross_at_first_contact", "q_prune", "total_ticks"]
+                     "x_cross_at_first_contact", "x_cross_early", "q_prune", "total_ticks"]
     @test names(df) == expected_cols
 
     # I-08: CSV round-trip preserves numeric fields to 6 decimal places

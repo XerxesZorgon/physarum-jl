@@ -1,4 +1,4 @@
-using Agents, CSV, DataFrames
+using Agents, CSV, DataFrames, Statistics
 export RunResult, run_replicate, run_condition, monte_carlo, save_runs
 
 struct RunResult
@@ -9,6 +9,8 @@ struct RunResult
     first_contact_tick::Int
     x_cross_final::Float64
     x_cross_at_first_contact::Float64
+    x_cross_early::Float64   # median x_cross of early arrivals;
+                             # -9999.0 if fewer than 3 arrivals logged
     q_prune::Float64
     total_ticks::Int
     x_cross_history::Vector{Tuple{Int,Float64}}
@@ -27,6 +29,8 @@ function run_replicate(params::PhysarumParams,
     props = abmproperties(model)
     history = props.x_cross_history
     xc_at_contact = isempty(history) ? -9999.0 : history[1][2]
+    early = props.early_arrivals
+    xc_early = length(early) >= 3 ? median(early) : -9999.0
     return RunResult(
         run_id,
         params.condition,
@@ -35,6 +39,7 @@ function run_replicate(params::PhysarumParams,
         props.first_contact_tick,
         measure_x_cross(props),
         xc_at_contact,
+        xc_early,
         pruning_quality(props),
         abmtime(model),
         copy(history)
@@ -82,6 +87,7 @@ function save_runs(results::Dict{Symbol,Vector{RunResult}},
             first_contact_tick      = r.first_contact_tick,
             x_cross_final           = r.x_cross_final,
             x_cross_at_first_contact = r.x_cross_at_first_contact,
+            x_cross_early           = r.x_cross_early,
             q_prune                 = r.q_prune,
             total_ticks             = r.total_ticks,
         ) for r in runs]

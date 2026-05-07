@@ -43,6 +43,8 @@ mutable struct PhysarumProperties
     params::PhysarumParams
     first_contact_tick::Int
     x_cross_history::Vector{Tuple{Int,Float64}}
+    early_arrivals::Vector{Float64}   # x_cross of agents arriving
+                                      # within 5% of first_contact_tick
     last_tick::Int
 end
 
@@ -90,6 +92,7 @@ function build_model(params::PhysarumParams, seed::Int)
         params,
         -1,                         # first_contact_tick
         Tuple{Int,Float64}[],       # x_cross_history
+        Float64[],                  # early_arrivals
         0                           # last_tick
     )
 
