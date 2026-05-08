@@ -1,5 +1,5 @@
-using Statistics, Roots
-export measure_x_cross, pruning_quality, snells_prediction
+using Statistics
+export measure_x_cross, pruning_quality
 
 """
     measure_x_cross(props::PhysarumProperties) -> Float64
@@ -63,30 +63,4 @@ function pruning_quality(props::PhysarumProperties)::Float64
     return max(0.0, 1.0 - n_active / n_total)
 end
 
-"""
-    snells_prediction(params::PhysarumParams) -> Float64
 
-Geometric Snell's Law prediction for x_cross. Finds the boundary
-crossing x-coordinate (in NetLogo convention) that minimises total
-travel time from source to food across the two-speed zone boundary.
-Uses Roots.jl bisection on the Fermat stationarity condition.
-"""
-function snells_prediction(params::PhysarumParams)::Float64
-    # Convert source and food from sim coords to NetLogo coords
-    sx = netlogo_x(patch_idx(params.source_sim[1]))   # ≈ -75.0
-    sy = netlogo_y(patch_idx(params.source_sim[2]))   # ≈ -75.0
-    fx = netlogo_x(patch_idx(params.food_sim[1]))     # ≈  75.0
-    fy = netlogo_y(patch_idx(params.food_sim[2]))     # ≈  75.0
-    by = 0.0   # zone boundary in NetLogo y-coords
-
-    # Zone speeds — effective_speeds handles :A, :B, :C
-    v1, v2 = effective_speeds(params)
-
-    # Fermat stationarity: d(T)/d(xc) = 0
-    # T(xc) = hypot(xc-sx, by-sy)/v1 + hypot(fx-xc, fy-by)/v2
-    # f(xc) = sin(θ1)/v1 - sin(θ2)/v2 = 0
-    f(xc) = (xc - sx) / (v1 * hypot(xc - sx, by - sy)) -
-            (fx - xc) / (v2 * hypot(fx - xc, fy - by))
-
-    return find_zero(f, (-99.0, 99.0))
-end

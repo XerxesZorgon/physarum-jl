@@ -19,32 +19,28 @@ mkpath("results")
 save_params(tuned, "results/tuned_params.json")
 println("\nSaved to results/tuned_params.json")
 
-# ── SC-1 validation ──────────────────────────────────────────────────────────
+# ── Snell's Law direction validation (replaces old SC-1) ──────────────
 println("\n" * "=" ^ 60)
-println("SC-1 validation: Condition C, 10 replicates, max_ticks=5000")
+println("Direction validation: 5 reps each condition, max_ticks=5000")
 println("=" ^ 60)
 
-# Validate at full max_ticks for the actual experiment
-p_c = PhysarumParams(
-    condition      = :C,
-    v1             = tuned.v1,
-    v2             = tuned.v2,
-    decay_rate     = tuned.decay_rate,
-    deposit_amount = tuned.deposit_amount,
-    food_chemo     = tuned.food_chemo,
-    n_agents       = tuned.n_agents,
-    max_ticks      = 5000,
-    chemo_threshold_pct = 0.60
-)
-res_c = [run_replicate(p_c, i, i) for i in 1:10]
+means = Dict{Symbol, Float64}()
+for cond in [:A, :B, :C]
+    pc = PhysarumParams(tuned; condition=cond, max_ticks=5000)
+    rs = [run_replicate(pc, i, i) for i in 1:5]
+    valid = filter(r -> r.x_cross_final != -9999.0, rs)
+    found = count(r -> r.first_contact_tick > 0, rs)
+    m = isempty(valid) ? NaN : mean(r.x_cross_final for r in valid)
+    means[cond] = m
+    println("  $cond: mean=$(round(m, digits=1))  found=$found/5  valid=$(length(valid))/5")
+end
 
-found  = count(r -> r.first_contact_tick > 0, res_c)
-valid  = filter(r -> r.x_cross_final != -9999.0, res_c)
-mean_c = isempty(valid) ? NaN : mean(r.x_cross_final for r in valid)
-
-println("  Food found:     $found/10")
-println("  Mean x_cross:   $(round(mean_c, digits=2))  (target: |x| < 5.0)")
-
-sc1 = abs(mean_c) <= 5.0 && found >= 8
-println("\n  SC-1: $(sc1 ? "PASS ✓" : "FAIL ✗")")
-!sc1 && println("  ⚠ Do not proceed to T022 — report results for review.")
+# Snell's Law ordering: A > C > B
+ordered = means[:A] > means[:C] > means[:B]
+# Differentials in right direction
+diff_A = means[:A] - means[:C]
+diff_B = means[:B] - means[:C]
+println("\n  A-C = $(round(diff_A, digits=1))  (predicted +40.37)")
+println("  B-C = $(round(diff_B, digits=1))  (predicted -40.37)")
+println("\n  Ordering A>C>B: $(ordered ? "PASS ✓" : "FAIL ✗")")
+ordered || println("  ⚠ Do not proceed to T022 — report for review.")

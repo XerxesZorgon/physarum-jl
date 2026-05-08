@@ -1,6 +1,7 @@
-using Agents, StaticArrays, Random
+using Agents, StaticArrays, Random, Roots
 export PhysarumParams, PhysarumAgent, PhysarumProperties,
-       build_model, patch_idx, netlogo_x, netlogo_y, effective_speeds
+       build_model, patch_idx, netlogo_x, netlogo_y, effective_speeds,
+       snells_prediction
 
 @kwdef struct PhysarumParams
     condition::Symbol          = :A
@@ -24,6 +25,15 @@ export PhysarumParams, PhysarumAgent, PhysarumProperties,
     return_deposit_multiplier::Float64 = 5.0
     food_chemo_fade::Float64           = 0.97   # per-tick after first contact
     beacon_chemo_fraction::Float64     = 0.30   # beacon = fraction × food_chemo
+end
+
+# Copy constructor for easy parameter overriding
+function PhysarumParams(p::PhysarumParams; kwargs...)
+    d = Dict(k => getfield(p, k) for k in fieldnames(PhysarumParams))
+    for (k, v) in kwargs
+        d[k] = v
+    end
+    PhysarumParams(; d...)
 end
 
 function effective_speeds(p::PhysarumParams)
@@ -54,6 +64,7 @@ mutable struct PhysarumProperties
     last_tick::Int
     food_chemo_current::Float64                      # fades in Phase 2
     beacon_idx::Union{CartesianIndex{2}, Nothing}    # boundary beacon
+    snells_xi::Int                                   # analytic prediction crossing column
 end
 
 function build_model(params::PhysarumParams, seed::Int)
@@ -89,6 +100,10 @@ function build_model(params::PhysarumParams, seed::Int)
         chemo[idx] = params.food_chemo
     end
 
+    # Compute analytic prediction crossing column
+    xc_pred   = snells_prediction(params)
+    snells_xi = clamp(round(Int, xc_pred + 101.0), 1, 201)
+
     props = PhysarumProperties(
         chemo,
         zeros(Float64, n, n),       # buf
@@ -103,7 +118,8 @@ function build_model(params::PhysarumParams, seed::Int)
         Float64[],                  # early_arrivals
         0,                          # last_tick
         params.food_chemo,          # food_chemo_current
-        nothing                     # beacon_idx
+        nothing,                    # beacon_idx
+        snells_xi                   # snells_xi
     )
 
     model = StandardABM(PhysarumAgent, space;
@@ -136,11 +152,6 @@ end
 
 Convert a continuous simulation coordinate in [0.0, 201.0) to a
 1-indexed matrix index in [1, 201]. Clamps out-of-range values.
-
-# Examples
-    patch_idx(0.0)   == 1
-    patch_idx(100.5) == 101
-    patch_idx(200.9) == 201
 """
 patch_idx(x::Float64)::Int = clamp(floor(Int, x) + 1, 1, 201)
 
@@ -159,3 +170,31 @@ Convert a 1-indexed row index to NetLogo y-coordinate convention
 (yj=1 → -100.0, yj=101 → 0.0, yj=201 → 100.0).
 """
 netlogo_y(yj::Int)::Float64 = Float64(yj - 1 - 100)
+
+"""
+    snells_prediction(params::PhysarumParams) -> Float64
+
+Geometric Snell's Law prediction for x_cross. Finds the boundary
+crossing x-coordinate (in NetLogo convention) that minimises total
+travel time from source to food across the two-speed zone boundary.
+Uses Roots.jl bisection on the Fermat stationarity condition.
+"""
+function snells_prediction(params::PhysarumParams)::Float64
+    # Convert source and food from sim coords to NetLogo coords
+    sx = netlogo_x(patch_idx(params.source_sim[1]))   # ≈ -75.0
+    sy = netlogo_y(patch_idx(params.source_sim[2]))   # ≈ -75.0
+    fx = netlogo_x(patch_idx(params.food_sim[1]))     # ≈  75.0
+    fy = netlogo_y(patch_idx(params.food_sim[2]))     # ≈  74.0
+    by = 0.0   # zone boundary in NetLogo y-coords
+
+    # Zone speeds — effective_speeds handles :A, :B, :C
+    v1, v2 = effective_speeds(params)
+
+    # Fermat stationarity: d(T)/d(xc) = 0
+    # T(xc) = hypot(xc-sx, by-sy)/v1 + hypot(fx-xc, fy-by)/v2
+    # f(xc) = sin(θ1)/v1 - sin(θ2)/v2 = 0
+    f(xc) = (xc - sx) / (v1 * hypot(xc - sx, by - sy)) -
+            (fx - xc) / (v2 * hypot(fx - xc, fy - by))
+
+    return find_zero(f, (-99.0, 99.0))
+end

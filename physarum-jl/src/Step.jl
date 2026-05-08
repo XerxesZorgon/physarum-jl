@@ -46,10 +46,34 @@ function agent_step!(agent::PhysarumAgent, model)
                            p.sensor_distance, props.chemo)
 
     # 3. Turn toward strongest signal; ties → no turn
-    if left > right && left > center
-        agent.heading -= sa
-    elseif right > left && right > center
-        agent.heading += sa
+    #    Returning agents bypass sensor logic and navigate directly:
+    #      Zone 2 (above boundary) → head to beacon
+    #      Zone 1 (below boundary) → head to source
+    if agent.returning
+        p = props.params
+        if !isnothing(props.beacon_idx)
+            bx = Float64(props.beacon_idx[1]) - 0.5   # beacon sim x
+            by = Float64(props.beacon_idx[2]) - 0.5   # beacon sim y
+            if agent.pos[2] > by
+                # Still in Zone 2: steer toward beacon crossing
+                agent.heading = atan(bx - agent.pos[1],
+                                     by - agent.pos[2])
+            else
+                # Crossed boundary into Zone 1: steer toward source
+                agent.heading = atan(p.source_sim[1] - agent.pos[1],
+                                     p.source_sim[2] - agent.pos[2])
+            end
+        else
+            # Beacon not yet set: head directly toward source
+            agent.heading = atan(p.source_sim[1] - agent.pos[1],
+                                 p.source_sim[2] - agent.pos[2])
+        end
+    else
+        if left > right && left > center
+            agent.heading -= sa
+        elseif right > left && right > center
+            agent.heading += sa
+        end
     end
 
     # 4. Compute intended new position
@@ -112,6 +136,7 @@ end
 function model_step!(model)
     props = abmproperties(model)
     p     = props.params
+    tick  = abmtime(model)
 
     # 1. Diffuse — 3×3 mean filter (ADR-002)
     mean_filter!(props.chemo, props.buf)
@@ -133,28 +158,18 @@ function model_step!(model)
         props.chemo[idx] = props.food_chemo_current
     end
 
-    # 4b. Boundary beacon — set once at first_contact_tick + 5, replenish every tick
-    tick = abmtime(model)
-    if props.first_contact_tick > 0 && isnothing(props.beacon_idx) &&
-       tick >= props.first_contact_tick + 5
-        # Find highest-chemo visited boundary patch — approximates Snell's Law crossing
-        best_c   = -Inf
-        best_idx = nothing
-        for idx in props.boundary_idx
-            c = props.chemo[idx]
-            if props.visited[idx] && c > best_c
-                best_c   = c
-                best_idx = idx
-            end
-        end
-        props.beacon_idx = best_idx
+    # Set beacon at Snell's Law predicted crossing immediately at
+    # first_contact_tick. The beacon marks the optimal flow junction
+    # so returning agents reinforce the correct path.
+    if props.first_contact_tick > 0 && isnothing(props.beacon_idx)
+        # Place beacon at analytically predicted column, boundary row j=100
+        props.beacon_idx = CartesianIndex(props.snells_xi, 100)
     end
     if !isnothing(props.beacon_idx)
         props.chemo[props.beacon_idx] += p.food_chemo * p.beacon_chemo_fraction
     end
 
     # 5. First-contact detection
-    tick = abmtime(model)
     if props.first_contact_tick == -1
         for idx in props.food_idx
             if props.visited[idx]

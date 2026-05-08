@@ -55,9 +55,9 @@ function run_tuning(base_params::PhysarumParams;
                     seeds       = collect(1:10))
 
     result = bboptimize(obj;
-        SearchRange  = [(0.05, 0.50),    # decay_rate
+        SearchRange  = [(0.01, 0.30),    # decay_rate
                         (2.0,  15.0),    # deposit_amount
-                        (100.0, 2000.0), # food_chemo
+                        (50.0, 500.0),   # food_chemo
                         (200.0, 800.0)], # n_agents (treated as Float64)
         NumDimensions = 4,
         Method        = :adaptive_de_rand_1_bin_radiuslimited,
