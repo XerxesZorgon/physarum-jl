@@ -46,14 +46,39 @@ function run_replicate(params::PhysarumParams,
     )
 end
 
+"""
+    run_condition(params, seeds) -> Vector{RunResult}
+
+Run one replicate per seed in parallel using Threads.@threads.
+"""
 function run_condition(params::PhysarumParams,
                        seeds::Vector{Int})::Vector{RunResult}
-    error("run_condition not yet implemented — see T022")
+    n       = length(seeds)
+    results = Vector{RunResult}(undef, n)
+    Threads.@threads for i in 1:n
+        results[i] = run_replicate(params, i, seeds[i])
+    end
+    return results
 end
 
+"""
+    monte_carlo(base_params, n_reps, base_seed) -> Dict{Symbol,Vector{RunResult}}
+
+Run n_reps replicates for each of the three conditions (A, B, C).
+Conditions A and B share the same seeds for paired comparison (SC-3).
+"""
 function monte_carlo(base_params::PhysarumParams,
-                     n_reps::Int, base_seed::Int)
-    error("monte_carlo not yet implemented — see T022")
+                     n_reps::Int,
+                     base_seed::Int)::Dict{Symbol,Vector{RunResult}}
+    seeds = collect(base_seed : base_seed + n_reps - 1)
+    return Dict(
+        :A => run_condition(
+                  PhysarumParams(base_params; condition=:A), seeds),
+        :B => run_condition(
+                  PhysarumParams(base_params; condition=:B), seeds),
+        :C => run_condition(
+                  PhysarumParams(base_params; condition=:C), seeds)
+    )
 end
 
 """
