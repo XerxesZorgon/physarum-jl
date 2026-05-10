@@ -3,6 +3,24 @@
 All notable changes to physarum-jl are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.2.0] — 2026-05-10
+
+### Added
+- Three-mode initialization framework: `:point_source`, `:forward_only`, `:uniform`
+- Mode-specific behavior dispatch in `agent_step!` and `model_step!`
+- `:forward_only` mode: exploration-only behavior with continuous food replenishment
+- `:uniform` mode: domain-wide agent spawning and two-zone food replenishment
+- Flux-weighted centroid measurement for `:uniform` mode boundary crossing
+- New regression test suite: `test/test_v02.jl` (20+ new tests)
+- ADR-006: Three-mode Initialization for Scientific Validation
+
+### Fixed
+- Improved `measure_x_cross` stability for sparse exploratory wavefronts
+
+### Results (v0.2.0 Pilot)
+- `:forward_only` Condition B: x_cross_at_first_contact = −53.0 (predicted −40.37)
+- `:uniform` Condition B: x_cross = −6.6 (predicted 0.0)
+
 ## [0.1.0] — 2026-05-06
 
 ### Added

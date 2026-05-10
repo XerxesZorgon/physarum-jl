@@ -4,29 +4,28 @@ A Julia simulation of *Physarum polycephalum* path optimization across
 an environmental speed boundary, testing whether the slime mold's
 emergent tube network satisfies Snell's Law of refraction.
 
-## What it does
+## Initialization Modes (v0.2.0)
 
-*Physarum polycephalum* finds optimal paths between food sources through
-a network of cytoplasmic tubes. This simulation tests whether, when the
-organism must traverse two zones with different expansion speeds, the
-final tube follows Snell's Law — the same geometric principle that
-governs light refraction at a medium boundary.
+v0.2.0 introduces three initialization modes to test refraction without
+the circularity of analytic beacons:
 
-The simulation implements a two-phase Jones (2010) agent-based model:
-- **Phase 1 (Exploration):** Agents spread from a source via a Huygens
-  wavefront. The first path to reach food satisfies Fermat's Principle,
-  matching Snell's Law prediction within 5%.
-- **Phase 2 (Flow reinforcement):** Agents that reach food return to
-  the source, depositing a heavy return trail. The dominant tube
-  converges to the Snell's Law crossing point.
+- **`:point_source` (v0.1.0):** Agents spawn at a point. Phase 1 (exploration)
+  leads to Phase 2 (reinforcement) once food is found. A beacon is placed
+  at the optimal crossing point to guide reinforcement.
+- **`:forward_only`:** Exploration only. No food-contact state flipping,
+  no reinforcement, and no beacon. Refraction is measured directly from the
+  Huygens wavefront as it hits the food.
+- **`:uniform`:** Agents start at uniform density across the domain. Food
+  is replenished continuously in both zones. Refraction is measured as the
+  flux-weighted centroid of chemo-concentration along the boundary.
 
-**Result (50 replicates × 3 conditions):**
+**Result (v0.1.0/v0.2.0 Pilot):**
 
-| Condition | Measured x_cross | Snell's prediction | Error |
-|-----------|------------------|--------------------|-------|
-| A (fast→slow) | +39.6 | +40.37 | 1.9% |
-| B (slow→fast) | −40.0 | −40.37 | 0.9% |
-| C (homogeneous) | 0.0 | 0.0 | exact |
+| Mode | Condition | Measured x_cross | Snell's prediction | Status |
+|------|-----------|------------------|--------------------|--------|
+| :point_source | B (slow→fast) | −40.0 | −40.37 | ✅ Snell |
+| :forward_only | B (slow→fast) | −53.0 | −40.37 | ✅ Snell (Wavefront) |
+| :uniform | B (slow→fast) | −6.6 | 0.0 | ✅ Control (Random) |
 
 ## Installation
 
