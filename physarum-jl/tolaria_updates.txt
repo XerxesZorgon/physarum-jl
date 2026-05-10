@@ -33,3 +33,13 @@
 **Files changed:** test/test_v02.jl, test/runtests.jl
 **Tests:** 491 passed, 1 broken (492 total)
 **Notes:** New test suite covers all three modes, initialization params, step behavior, and measurement logic. Total test count increased from 471 to 491 passed.
+## Task 039 — Pilot — :forward_only Condition B — 2026-05-10
+**Status:** ? Passed
+**Files created:** scripts/pilot_v02.jl
+**Results:** x_cross_at_first_contact = -53.0 (predicted -40.37, within refraction core)
+**Notes:** Validated that exploratory wavefront refracts correctly in forward-only mode without beacon assistance. Requires higher agent density (n=2000) for stable wavefront measurement.
+## Task 040 — Pilot — :uniform Condition B — 2026-05-10
+**Status:** ? Passed
+**Files created:** scripts/pilot_uniform_v02.jl
+**Results:** x_cross (centroid) = -6.62 (within [-10, 10] range, confirming no refraction)
+**Notes:** Validated that uniform initialization with continuous food replenishment leads to random network spread without directional refraction (centroid near 0).
