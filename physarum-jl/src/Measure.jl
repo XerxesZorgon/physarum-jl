@@ -9,33 +9,46 @@ zone boundary (rows j=100, j=101). Returns -9999.0 if no boundary patch
 clears the threshold or no visited patches exist.
 """
 function measure_x_cross(props::PhysarumProperties)::Float64
-    # 1. Collect chemo values from interior visited non-zero patches
-    interior = Float64[]
-    for idx in findall(props.visited)
-        c = props.chemo[idx]
-        if c > 0.0 && idx ∉ props.food_idx && idx ∉ props.source_idx
-            push!(interior, c)
+    if props.params.init_mode == :uniform
+        total_w, weighted_sum = 0.0, 0.0
+        for idx in props.boundary_idx
+            c = props.chemo[idx]
+            if props.visited[idx] && c > 0.0
+                weighted_sum += netlogo_x(idx[1]) * c
+                total_w      += c
+            end
         end
-    end
-    isempty(interior) && return -9999.0
-
-    # 2. Threshold: chemo_threshold_pct percentile of interior values
-    τ = quantile(interior, props.params.chemo_threshold_pct)
-
-    # 3. Find boundary patch (j=100 or j=101) with maximum chemo ≥ τ
-    best_idx   = nothing
-    best_chemo = -Inf
-    for idx in props.boundary_idx
-        c = props.chemo[idx]
-        if props.visited[idx] && c >= τ && c > best_chemo
-            best_chemo = c
-            best_idx   = idx
+        return total_w > 0.0 ? weighted_sum / total_w : -9999.0
+    else
+        # :point_source and :forward_only — existing max-chemo logic unchanged
+        # 1. Collect chemo values from interior visited non-zero patches
+        interior = Float64[]
+        for idx in findall(props.visited)
+            c = props.chemo[idx]
+            if c > 0.0 && idx ∉ props.food_idx && idx ∉ props.source_idx
+                push!(interior, c)
+            end
         end
-    end
-    isnothing(best_idx) && return -9999.0
+        isempty(interior) && return -9999.0
 
-    # 4. idx[1] is the column index (x direction)
-    return netlogo_x(best_idx[1])
+        # 2. Threshold: chemo_threshold_pct percentile of interior values
+        τ = quantile(interior, props.params.chemo_threshold_pct)
+
+        # 3. Find boundary patch (j=100 or j=101) with maximum chemo ≥ τ
+        best_idx   = nothing
+        best_chemo = -Inf
+        for idx in props.boundary_idx
+            c = props.chemo[idx]
+            if props.visited[idx] && c >= τ && c > best_chemo
+                best_chemo = c
+                best_idx   = idx
+            end
+        end
+        isnothing(best_idx) && return -9999.0
+
+        # 4. idx[1] is the column index (x direction)
+        return netlogo_x(best_idx[1])
+    end
 end
 
 """

@@ -6,4 +6,5 @@ using Test, Agents, PhysarumSim
     include("test_measure.jl")
     include("test_experiment.jl")
     include("test_integration.jl")
+    include("test_v02.jl")
 end

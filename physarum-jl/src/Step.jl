@@ -46,29 +46,38 @@ function agent_step!(agent::PhysarumAgent, model)
                            p.sensor_distance, props.chemo)
 
     # 3. Turn toward strongest signal; ties → no turn
-    #    Returning agents bypass sensor logic and navigate directly:
+    #    Returning agents (point_source only) bypass sensor logic and navigate directly:
     #      Zone 2 (above boundary) → head to beacon
     #      Zone 1 (below boundary) → head to source
-    if agent.returning
-        p = props.params
-        if !isnothing(props.beacon_idx)
-            bx = Float64(props.beacon_idx[1]) - 0.5   # beacon sim x
-            by = Float64(props.beacon_idx[2]) - 0.5   # beacon sim y
-            if agent.pos[2] > by
-                # Still in Zone 2: steer toward beacon crossing
-                agent.heading = atan(bx - agent.pos[1],
-                                     by - agent.pos[2])
+    if props.params.init_mode == :point_source
+        if agent.returning
+            p = props.params
+            if !isnothing(props.beacon_idx)
+                bx = Float64(props.beacon_idx[1]) - 0.5   # beacon sim x
+                by = Float64(props.beacon_idx[2]) - 0.5   # beacon sim y
+                if agent.pos[2] > by
+                    # Still in Zone 2: steer toward beacon crossing
+                    agent.heading = atan(bx - agent.pos[1],
+                                         by - agent.pos[2])
+                else
+                    # Crossed boundary into Zone 1: steer toward source
+                    agent.heading = atan(p.source_sim[1] - agent.pos[1],
+                                         p.source_sim[2] - agent.pos[2])
+                end
             else
-                # Crossed boundary into Zone 1: steer toward source
+                # Beacon not yet set: head directly toward source
                 agent.heading = atan(p.source_sim[1] - agent.pos[1],
                                      p.source_sim[2] - agent.pos[2])
             end
         else
-            # Beacon not yet set: head directly toward source
-            agent.heading = atan(p.source_sim[1] - agent.pos[1],
-                                 p.source_sim[2] - agent.pos[2])
+            if left > right && left > center
+                agent.heading -= sa
+            elseif right > left && right > center
+                agent.heading += sa
+            end
         end
     else
+        # :forward_only and :uniform — exploration only, no Phase 2
         if left > right && left > center
             agent.heading -= sa
         elseif right > left && right > center
@@ -105,18 +114,19 @@ function agent_step!(agent::PhysarumAgent, model)
     props.chemo[xi, yj]    += p.deposit_amount * agent.speed * deposit_multiplier
     props.visited[xi, yj]   = true
 
-    # Phase 2: food contact → flip heading and enter return mode
-    if !agent.returning && CartesianIndex(xi, yj) ∈ props.food_idx
-        agent.returning = true
-        agent.heading  += π
-    end
+    # Phase 2: food contact and return behavior (point_source only)
+    if props.params.init_mode == :point_source
+        if !agent.returning && CartesianIndex(xi, yj) ∈ props.food_idx
+            agent.returning = true
+            agent.heading  += π
+        end
 
-    # Phase 2: returning agent reaches source → reset to exploration
-    if agent.returning
-        if hypot(agent.pos[1] - p.source_sim[1],
-                 agent.pos[2] - p.source_sim[2]) <= p.source_radius
-            agent.returning = false
-            agent.heading   = 2π * rand(abmrng(model))
+        if agent.returning
+            if hypot(agent.pos[1] - p.source_sim[1],
+                     agent.pos[2] - p.source_sim[2]) <= p.source_radius
+                agent.returning = false
+                agent.heading   = 2π * rand(abmrng(model))
+            end
         end
     end
 
@@ -147,26 +157,39 @@ function model_step!(model)
     # 3. Zero sub-threshold values
     @. props.chemo = ifelse(props.chemo < 0.001, 0.0, props.chemo)
 
-    # 4. Replenish food — Phase 2: fade gradient so return flow takes over
-    if props.first_contact_tick > 0
-        props.food_chemo_current = max(
-            p.food_chemo * 0.05,
-            props.food_chemo_current * p.food_chemo_fade
-        )
-    end
-    for idx in props.food_idx
-        props.chemo[idx] = props.food_chemo_current
-    end
+    # 4. Replenish food and manage beacon
+    if props.params.init_mode == :point_source
+        # v0.1.0 — food fade + beacon unchanged
+        if props.first_contact_tick > 0
+            props.food_chemo_current = max(
+                p.food_chemo * 0.05,
+                props.food_chemo_current * p.food_chemo_fade)
+        end
+        for idx in props.food_idx
+            props.chemo[idx] = props.food_chemo_current
+        end
+        if props.first_contact_tick > 0 && isnothing(props.beacon_idx)
+            # Place beacon at analytically predicted column, boundary row j=100
+            props.beacon_idx = CartesianIndex(props.snells_xi, 100)
+        end
+        if !isnothing(props.beacon_idx)
+            props.chemo[props.beacon_idx] += p.food_chemo * p.beacon_chemo_fraction
+        end
 
-    # Set beacon at Snell's Law predicted crossing immediately at
-    # first_contact_tick. The beacon marks the optimal flow junction
-    # so returning agents reinforce the correct path.
-    if props.first_contact_tick > 0 && isnothing(props.beacon_idx)
-        # Place beacon at analytically predicted column, boundary row j=100
-        props.beacon_idx = CartesianIndex(props.snells_xi, 100)
-    end
-    if !isnothing(props.beacon_idx)
-        props.chemo[props.beacon_idx] += p.food_chemo * p.beacon_chemo_fraction
+    elseif props.params.init_mode == :forward_only
+        # Single food, continuous replenishment, no fade, no beacon
+        for idx in props.food_idx
+            props.chemo[idx] = p.food_chemo
+        end
+
+    else  # :uniform
+        # Two foods, both replenished continuously, no beacon
+        for idx in props.food_idx        # Food B (Zone 2)
+            props.chemo[idx] = p.food_chemo
+        end
+        for idx in props.food_a_idx      # Food A (Zone 1)
+            props.chemo[idx] = p.food_chemo
+        end
     end
 
     # 5. First-contact detection

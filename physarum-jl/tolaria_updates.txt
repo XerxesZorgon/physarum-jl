@@ -1,0 +1,35 @@
+## Task 032 — ADR-006 — three-mode initialization design — 2026-05-10
+**Status:** ? Passed
+**Files changed:** docs/adr/ADR-006-three-mode-initialization.md
+**Tests:** N/A (Documentation check passed)
+**Notes:** ADR created per spec.
+## Task 033 — Add init_mode, food_a_sim, agent_density to PhysarumParams — 2026-05-10
+**Status:** ? Passed
+**Files changed:** src/Model.jl
+**Tests:** 471 passed, 0 failures (v0.1.0 suite preserved)
+**Notes:** Parameters added to structs; build_model handles food_a_idx and uniform chemo init.
+## Task 034 — Uniform agent spawn in build_model — 2026-05-10
+**Status:** ? Passed
+**Files changed:** src/Model.jl
+**Tests:** 471 passed, 0 failures (v0.1.0 suite preserved)
+**Notes:** Agent spawn logic now dispatches on init_mode.
+## Task 035 — agent_step! — disable Phase 2 for :forward_only and :uniform — 2026-05-10
+**Status:** ? Passed
+**Files changed:** src/Step.jl
+**Tests:** 471 passed, 0 failures (v0.1.0 suite preserved)
+**Notes:** Phase 2 logic (returning, navigation, food flip) now gated by point_source mode.
+## Task 036 — model_step! — food replenishment and beacon dispatch — 2026-05-10
+**Status:** ? Passed
+**Files changed:** src/Step.jl
+**Tests:** 471 passed, 0 failures (v0.1.0 suite preserved)
+**Notes:** model_step! now handles food replenishment and beacon placement based on init_mode.
+## Task 037 — measure_x_cross — flux-weighted centroid for :uniform — 2026-05-10
+**Status:** ? Passed
+**Files changed:** src/Measure.jl
+**Tests:** 471 passed, 0 failures (v0.1.0 suite preserved)
+**Notes:** measure_x_cross now dispatches to flux-weighted centroid for uniform mode.
+## Task 038 — New test suite — test_v02.jl — 2026-05-10
+**Status:** ? Passed
+**Files changed:** test/test_v02.jl, test/runtests.jl
+**Tests:** 491 passed, 1 broken (492 total)
+**Notes:** New test suite covers all three modes, initialization params, step behavior, and measurement logic. Total test count increased from 471 to 491 passed.

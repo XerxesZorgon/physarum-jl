@@ -25,6 +25,11 @@ export PhysarumParams, PhysarumAgent, PhysarumProperties,
     return_deposit_multiplier::Float64 = 5.0
     food_chemo_fade::Float64           = 0.97   # per-tick after first contact
     beacon_chemo_fraction::Float64     = 0.30   # beacon = fraction × food_chemo
+
+    # v0.2.0 — three-mode parameters
+    init_mode::Symbol              = :point_source   # :point_source | :forward_only | :uniform
+    food_a_sim::NTuple{2,Float64}  = (25.5, 25.5)   # Food A (Zone 1) — uniform mode
+    agent_density::Float64         = 0.10            # fraction of n² — uniform mode
 end
 
 # Copy constructor for easy parameter overriding
@@ -54,6 +59,7 @@ mutable struct PhysarumProperties
     medium_speed::Matrix{Float64}
     visited::Matrix{Bool}
     food_idx::Vector{CartesianIndex{2}}
+    food_a_idx::Vector{CartesianIndex{2}}   # Food A patches (empty for non-uniform)
     source_idx::Vector{CartesianIndex{2}}
     boundary_idx::Vector{CartesianIndex{2}}
     params::PhysarumParams
@@ -94,10 +100,21 @@ function build_model(params::PhysarumParams, seed::Int)
     boundary_idx = [CartesianIndex(i, j)
                     for j in (100, 101) for i in 1:n]
 
+    food_a_idx = [CartesianIndex(i, j)
+                  for j in 1:n, i in 1:n
+                  if hypot(Float64(i-1) - params.food_a_sim[1] + 0.5,
+                           Float64(j-1) - params.food_a_sim[2] + 0.5)
+                     <= params.food_radius]
+
     # Chemo field — food initialised, source starts at zero
     chemo = zeros(Float64, n, n)
     for idx in food_idx
         chemo[idx] = params.food_chemo
+    end
+    if params.init_mode == :uniform
+        for idx in food_a_idx
+            chemo[idx] = params.food_chemo
+        end
     end
 
     # Compute analytic prediction crossing column
@@ -110,6 +127,7 @@ function build_model(params::PhysarumParams, seed::Int)
         medium_speed,
         falses(n, n),               # visited
         food_idx,
+        food_a_idx,
         source_idx,
         boundary_idx,
         params,
@@ -128,20 +146,33 @@ function build_model(params::PhysarumParams, seed::Int)
                         model_step! = model_step!,
                         rng         = Xoshiro(seed))
 
-    # Spawn agents within source_radius of source_sim
+    # Spawn agents
     rng = abmrng(model)
-    for _ in 1:params.n_agents
-        r = params.source_radius * sqrt(rand(rng))
-        θ = 2π * rand(rng)
-        x = clamp(params.source_sim[1] + r * cos(θ), 0.0, Float64(n) - 1e-6)
-        y = clamp(params.source_sim[2] + r * sin(θ), 0.0, Float64(n) - 1e-6)
-        heading = 2π * rand(rng)
-        spd = medium_speed[patch_idx(x), patch_idx(y)]
-        add_agent!(SVector(x, y), model;
-                   vel       = SVector(0.0, 0.0),
-                   heading   = heading,
-                   speed     = spd,
-                   returning = false)
+    if params.init_mode == :uniform
+        n_uniform = round(Int, params.agent_density * n * n)
+        for _ in 1:n_uniform
+            x = rand(rng) * (Float64(n) - 1e-6)
+            y = rand(rng) * (Float64(n) - 1e-6)
+            heading = 2π * rand(rng)
+            spd = medium_speed[patch_idx(x), patch_idx(y)]
+            add_agent!(SVector(x, y), model;
+                       vel = SVector(0.0, 0.0), heading = heading,
+                       speed = spd, returning = false)
+        end
+        println("Uniform mode: $n_uniform agents")
+    else
+        # :point_source and :forward_only — identical point-source spawn
+        for _ in 1:params.n_agents
+            r = params.source_radius * sqrt(rand(rng))
+            θ = 2π * rand(rng)
+            x = clamp(params.source_sim[1] + r * cos(θ), 0.0, Float64(n) - 1e-6)
+            y = clamp(params.source_sim[2] + r * sin(θ), 0.0, Float64(n) - 1e-6)
+            heading = 2π * rand(rng)
+            spd = medium_speed[patch_idx(x), patch_idx(y)]
+            add_agent!(SVector(x, y), model;
+                       vel = SVector(0.0, 0.0), heading = heading,
+                       speed = spd, returning = false)
+        end
     end
 
     return model
